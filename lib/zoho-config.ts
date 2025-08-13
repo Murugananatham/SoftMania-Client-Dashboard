@@ -5,7 +5,7 @@ export const ZOHO_CONFIG = {
   authUrl: "https://accounts.zoho.in/oauth/v2/auth",
   tokenUrl: "https://accounts.zoho.in/oauth/v2/token",
   scope:
-    "ZohoMeeting.meeting.READ,ZohoMeeting.manageOrg.READ,ZohoMeeting.meetinguds.READ,ZohoFiles.files.READ,ZohoMeeting.recording.READ,WorkDrive.files.ALL,ZohoMail.messages.READ,profile",
+    "ZohoMeeting.meeting.READ,ZohoMeeting.manageOrg.READ,ZohoMeeting.meetinguds.READ,ZohoFiles.files.READ,ZohoMeeting.recording.READ,WorkDrive.files.ALL,WorkDrive.teamfolders.READ,ZohoSearch.securesearch.READ,WorkDrive.team.READ,ZohoMail.messages.READ,profile",
   apiBaseUrl: "https://www.zohoapis.in",
 }
 
@@ -69,4 +69,37 @@ export interface ZohoRecording {
   meetingKey: string
   status: string
   isTranscriptGenerated: boolean
+}
+
+export interface ZohoWorkDriveUser {
+  id: string
+  display_name: string
+  email_id: string
+  privatespace: {
+    id: string
+    related_url: string
+  }
+}
+
+export interface ZohoWorkDriveFile {
+  id: string
+  type: string
+  attributes: {
+    name: string
+    created_time: string
+    modified_time: string
+    size_in_bytes: number
+    file_size: string
+    extension?: string
+    is_folder: boolean
+    shared_time?: string
+    shared_by?: string
+  }
+  relationships?: {
+    download?: {
+      links?: {
+        related?: string
+      }
+    }
+  }
 }

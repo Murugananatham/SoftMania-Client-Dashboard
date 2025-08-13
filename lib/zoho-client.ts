@@ -352,6 +352,194 @@ export class ZohoClient {
     return `${baseUrl}/webdownload?event-id=${erecordingId}&x-service=meetinglab&x-cli-msg=`
   }
 
+  async getWorkDriveUserInfo() {
+    try {
+      // Try Indian region first
+      let response = await fetch("https://www.zohoapis.in/workdrive/api/v1/users/me", {
+        headers: {
+          Authorization: `Bearer ${this.accessToken}`,
+          "Content-Type": "application/json",
+        },
+      })
+
+      // If Indian region fails, try global region
+      if (!response.ok && response.status === 404) {
+        console.log("Indian region failed for WorkDrive, trying global region...")
+        response = await fetch("https://www.zohoapis.com/workdrive/api/v1/users/me", {
+          headers: {
+            Authorization: `Bearer ${this.accessToken}`,
+            "Content-Type": "application/json",
+          },
+        })
+      }
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.error("WorkDrive user info request failed:", {
+          status: response.status,
+          statusText: response.statusText,
+          error: errorText,
+        })
+        throw new Error(`Failed to get WorkDrive user info: ${response.status} ${response.statusText}`)
+      }
+
+      const data = await response.json()
+      console.log("WorkDrive user info received:", data)
+      return data
+    } catch (error) {
+      console.error("Error in getWorkDriveUserInfo:", error)
+      throw error
+    }
+  }
+
+  async getWorkDrivePrivateSpace(userId: string) {
+    try {
+      // Try Indian region first
+      let response = await fetch(`https://www.zohoapis.in/workdrive/api/v1/users/${userId}/privatespace`, {
+        headers: {
+          Authorization: `Bearer ${this.accessToken}`,
+          "Content-Type": "application/json",
+        },
+      })
+
+      // If Indian region fails, try global region
+      if (!response.ok && response.status === 404) {
+        console.log("Indian region failed for WorkDrive privatespace, trying global region...")
+        response = await fetch(`https://www.zohoapis.com/workdrive/api/v1/users/${userId}/privatespace`, {
+          headers: {
+            Authorization: `Bearer ${this.accessToken}`,
+            "Content-Type": "application/json",
+          },
+        })
+      }
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.error("WorkDrive privatespace request failed:", {
+          status: response.status,
+          statusText: response.statusText,
+          error: errorText,
+        })
+        throw new Error(`Failed to get WorkDrive privatespace: ${response.status} ${response.statusText}`)
+      }
+
+      const data = await response.json()
+      console.log("WorkDrive privatespace received:", data)
+      return data
+    } catch (error) {
+      console.error("Error in getWorkDrivePrivateSpace:", error)
+      throw error
+    }
+  }
+
+  async getSharedFiles(privatespaceId: string) {
+    try {
+      const sharedFiles: any[] = []
+      const sharedFolders: any[] = []
+
+      // Try Indian region first
+      let baseUrl = "https://www.zohoapis.in"
+
+      // Get shared files (incomingfiles)
+      try {
+        let response = await fetch(`${baseUrl}/workdrive/api/v1/privatespace/${privatespaceId}/incomingfiles`, {
+          headers: {
+            Authorization: `Bearer ${this.accessToken}`,
+            "Content-Type": "application/json",
+          },
+        })
+
+        // If Indian region fails, try global region
+        if (!response.ok && response.status === 404) {
+          console.log("Indian region failed for shared files, trying global region...")
+          baseUrl = "https://www.zohoapis.com"
+          response = await fetch(`${baseUrl}/workdrive/api/v1/privatespace/${privatespaceId}/incomingfiles`, {
+            headers: {
+              Authorization: `Bearer ${this.accessToken}`,
+              "Content-Type": "application/json",
+            },
+          })
+        }
+
+        if (response.ok) {
+          const filesData = await response.json()
+          sharedFiles.push(...(filesData.data || []))
+        }
+      } catch (error) {
+        console.error("Error fetching shared files:", error)
+      }
+
+      // Get shared folders (incomingfolders)
+      try {
+        const response = await fetch(`${baseUrl}/workdrive/api/v1/privatespace/${privatespaceId}/incomingfolders`, {
+          headers: {
+            Authorization: `Bearer ${this.accessToken}`,
+            "Content-Type": "application/json",
+          },
+        })
+
+        if (response.ok) {
+          const foldersData = await response.json()
+          sharedFolders.push(...(foldersData.data || []))
+        }
+      } catch (error) {
+        console.error("Error fetching shared folders:", error)
+      }
+
+      // Return the raw API response structure for detailed display
+      const allItems = [...sharedFiles, ...sharedFolders]
+      console.log("Shared files and folders received:", allItems)
+      return allItems
+    } catch (error) {
+      console.error("Error in getSharedFiles:", error)
+      return []
+    }
+  }
+
+  async getFolderContents(folderId: string) {
+    try {
+      // Try Indian region first
+      let baseUrl = "https://www.zohoapis.in"
+
+      let response = await fetch(`${baseUrl}/workdrive/api/v1/files/${folderId}/files`, {
+        headers: {
+          Authorization: `Bearer ${this.accessToken}`,
+          "Content-Type": "application/json",
+        },
+      })
+
+      // If Indian region fails, try global region
+      if (!response.ok && response.status === 404) {
+        console.log("Indian region failed for folder contents, trying global region...")
+        baseUrl = "https://www.zohoapis.com"
+        response = await fetch(`${baseUrl}/workdrive/api/v1/files/${folderId}/files`, {
+          headers: {
+            Authorization: `Bearer ${this.accessToken}`,
+            "Content-Type": "application/json",
+          },
+        })
+      }
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.error("Folder contents request failed:", {
+          status: response.status,
+          statusText: response.statusText,
+          error: errorText,
+          folderId,
+        })
+        throw new Error(`Failed to get folder contents: ${response.status} ${response.statusText}`)
+      }
+
+      const data = await response.json()
+      console.log("Folder contents received:", data)
+      return data.data || []
+    } catch (error) {
+      console.error("Error in getFolderContents:", error)
+      return []
+    }
+  }
+
   async getWorkDriveFiles() {
     try {
       const data = await this.makeRequest("https://www.zohoapis.in/workdrive/api/v1/files")

@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { Calendar, Clock, Users, Video, Download, Eye, FileText, ExternalLink } from "lucide-react"
+import { Calendar, Clock, Users, Eye, ExternalLink } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -152,10 +152,8 @@ export function MeetingsTab() {
       </div>
 
       <Tabs defaultValue="meetings" className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-1">
           <TabsTrigger value="meetings">Meetings</TabsTrigger>
-          <TabsTrigger value="recordings">My Recordings</TabsTrigger>
-          <TabsTrigger value="shared">Shared Recordings</TabsTrigger>
         </TabsList>
 
         <TabsContent value="meetings" className="space-y-4">
@@ -266,130 +264,6 @@ export function MeetingsTab() {
                           </div>
                         </DialogContent>
                       </Dialog>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )}
-        </TabsContent>
-
-        <TabsContent value="recordings" className="space-y-4">
-          {recordings.length === 0 ? (
-            <Card>
-              <CardContent className="p-6 text-center">
-                <Video className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
-                <p className="text-muted-foreground">No recordings found</p>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="grid gap-4">
-              {recordings.map((recording) => (
-                <Card key={recording.recordingId}>
-                  <CardHeader>
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="text-lg">{recording.topic}</CardTitle>
-                      <Badge variant="outline">{recording.status}</Badge>
-                    </div>
-                    <CardDescription className="flex items-center gap-4">
-                      <span className="flex items-center gap-1">
-                        <Clock className="w-4 h-4" />
-                        {recording.datenTime}
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <Video className="w-4 h-4" />
-                        {formatRecordingDuration(recording.durationInMins)}
-                      </span>
-                      <span className="text-sm text-muted-foreground">Size: {recording.fileSize}</span>
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="flex gap-2 flex-wrap">
-                      <Button asChild size="sm">
-                        <a href={recording.playUrl} target="_blank" rel="noopener noreferrer">
-                          <Video className="w-4 h-4 mr-1" />
-                          Watch
-                        </a>
-                      </Button>
-                      <Button asChild variant="outline" size="sm">
-                        <a href={recording.downloadUrl} target="_blank" rel="noopener noreferrer">
-                          <Download className="w-4 h-4 mr-1" />
-                          Download
-                        </a>
-                      </Button>
-                      {recording.isTranscriptGenerated && recording.transcriptionDownloadUrl && (
-                        <Button asChild variant="outline" size="sm">
-                          <a href={recording.transcriptionDownloadUrl} target="_blank" rel="noopener noreferrer">
-                            <FileText className="w-4 h-4 mr-1" />
-                            Transcript
-                          </a>
-                        </Button>
-                      )}
-                      <Button asChild variant="outline" size="sm">
-                        <a href={recording.shareUrl} target="_blank" rel="noopener noreferrer">
-                          <ExternalLink className="w-4 h-4 mr-1" />
-                          Share
-                        </a>
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )}
-        </TabsContent>
-
-        <TabsContent value="shared" className="space-y-4">
-          {sharedRecordings.length === 0 ? (
-            <Card>
-              <CardContent className="p-6 text-center">
-                <Video className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
-                <p className="text-muted-foreground">No shared recordings found</p>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="grid gap-4">
-              {sharedRecordings.map((recording) => (
-                <Card key={recording.recordingId}>
-                  <CardHeader>
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="text-lg">{recording.topic}</CardTitle>
-                      <Badge variant="secondary">Shared</Badge>
-                    </div>
-                    <CardDescription className="flex items-center gap-4">
-                      <span className="flex items-center gap-1">
-                        <Clock className="w-4 h-4" />
-                        {recording.datenTime}
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <Video className="w-4 h-4" />
-                        {formatRecordingDuration(recording.durationInMins)}
-                      </span>
-                      <span className="text-sm text-muted-foreground">by {recording.creatorName}</span>
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="flex gap-2 flex-wrap">
-                      <Button asChild size="sm">
-                        <a href={recording.playUrl} target="_blank" rel="noopener noreferrer">
-                          <Video className="w-4 h-4 mr-1" />
-                          Watch
-                        </a>
-                      </Button>
-                      <Button asChild variant="outline" size="sm">
-                        <a href={recording.downloadUrl} target="_blank" rel="noopener noreferrer">
-                          <Download className="w-4 h-4 mr-1" />
-                          Download
-                        </a>
-                      </Button>
-                      {recording.isTranscriptGenerated && recording.transcriptionDownloadUrl && (
-                        <Button asChild variant="outline" size="sm">
-                          <a href={recording.transcriptionDownloadUrl} target="_blank" rel="noopener noreferrer">
-                            <FileText className="w-4 h-4 mr-1" />
-                            Transcript
-                          </a>
-                        </Button>
-                      )}
                     </div>
                   </CardContent>
                 </Card>

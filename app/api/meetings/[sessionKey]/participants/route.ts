@@ -6,11 +6,11 @@ export async function GET(request: NextRequest, { params }: { params: { sessionK
   try {
     const session = await getSession()
 
-    if (!session?.accessToken) {
+    if (!session?.tokens?.access_token) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 })
     }
 
-    const client = new ZohoClient(session.accessToken)
+    const client = new ZohoClient(session.tokens.access_token)
     const participants = await client.getMeetingParticipants(params.sessionKey)
 
     return NextResponse.json({ participants })
