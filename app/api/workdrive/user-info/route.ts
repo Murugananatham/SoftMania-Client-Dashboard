@@ -5,23 +5,16 @@ import { ZohoClient } from "@/lib/zoho-client"
 export async function GET(request: NextRequest) {
   try {
     const session = await getSession()
-
     if (!session?.tokens?.access_token) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 })
     }
 
-    const client = new ZohoClient(session.tokens.access_token)
-    const recordings = await client.getSharedRecordings()
+    const zohoClient = new ZohoClient(session.tokens.access_token)
+    const userInfo = await zohoClient.getWorkDriveUserInfo()
 
-    return NextResponse.json({ recordings })
+    return NextResponse.json(userInfo)
   } catch (error) {
-    console.error("Error fetching shared recordings:", error)
-    return NextResponse.json(
-      {
-        error: "Failed to fetch shared recordings",
-        recordings: [],
-      },
-      { status: 500 },
-    )
+    console.error("Error fetching WorkDrive user info:", error)
+    return NextResponse.json({ error: "Failed to fetch user info" }, { status: 500 })
   }
 }

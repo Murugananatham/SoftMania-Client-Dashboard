@@ -4,23 +4,19 @@ import { useEffect, useState } from "react"
 import {
   FileText,
   Download,
-  Play,
   Folder,
   File,
-  Calendar,
   ExternalLink,
   ChevronRight,
   Home,
   ArrowLeft,
-  Eye,
   FileVideo,
   FileImage,
   Music,
 } from "lucide-react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 
 interface WorkDriveFile {
   id: string
@@ -60,6 +56,8 @@ export function RecordingsTab() {
   const [loading, setLoading] = useState(true)
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(null)
   const [breadcrumbs, setBreadcrumbs] = useState<BreadcrumbItem[]>([])
+  const [previewFile, setPreviewFile] = useState<WorkDriveFile | null>(null)
+  const [showDownloadButtons, setShowDownloadButtons] = useState(false)
 
   useEffect(() => {
     fetchSharedFiles()
@@ -69,7 +67,6 @@ export function RecordingsTab() {
     setLoading(true)
     try {
       const url = folderId ? `/api/workdrive/folder-contents?folderId=${folderId}` : "/api/workdrive/shared-files"
-
       const response = await fetch(url)
       const data = await response.json()
 
@@ -99,9 +96,10 @@ export function RecordingsTab() {
     })
   }
 
+  // ... existing navigation functions ...
+
   const navigateToFolder = async (folder: WorkDriveFile) => {
     if (!folder.attributes.is_folder) return
-
     setCurrentFolderId(folder.id)
     setBreadcrumbs((prev) => [...prev, { id: folder.id, name: folder.attributes.name }])
     await fetchFolderContents(folder.id)
@@ -112,7 +110,6 @@ export function RecordingsTab() {
     try {
       const response = await fetch(`/api/workdrive/folder-contents?folderId=${folderId}`)
       const data = await response.json()
-
       if (data.error) {
         console.error("Error fetching folder contents:", data.error)
         setFiles([])
@@ -131,7 +128,6 @@ export function RecordingsTab() {
   const navigateToBreadcrumb = async (index: number) => {
     const targetBreadcrumbs = breadcrumbs.slice(0, index + 1)
     setBreadcrumbs(targetBreadcrumbs)
-
     if (targetBreadcrumbs.length === 0) {
       setCurrentFolderId(null)
       fetchSharedFiles()
@@ -144,10 +140,8 @@ export function RecordingsTab() {
 
   const navigateBack = () => {
     if (breadcrumbs.length === 0) return
-
     const newBreadcrumbs = breadcrumbs.slice(0, -1)
     setBreadcrumbs(newBreadcrumbs)
-
     if (newBreadcrumbs.length === 0) {
       setCurrentFolderId(null)
       fetchSharedFiles()
@@ -162,6 +156,16 @@ export function RecordingsTab() {
     setCurrentFolderId(null)
     setBreadcrumbs([])
     fetchSharedFiles()
+  }
+
+  const handleFileClick = (file: WorkDriveFile) => {
+    if (file.attributes.is_folder) {
+      navigateToFolder(file)
+    } else {
+      if (file.attributes.permalink) {
+        window.open(file.attributes.permalink, "_blank", "noopener,noreferrer")
+      }
+    }
   }
 
   const formatDate = (dateString?: string) => {
@@ -181,15 +185,12 @@ export function RecordingsTab() {
 
   const getFileIcon = (file: WorkDriveFile) => {
     const { attributes } = file
-
     if (attributes.is_folder) {
-      return <Folder className="w-6 h-6 text-blue-500" />
+      return <Folder className="w-5 h-5 text-blue-500" />
     }
-
     const extension = attributes.extn?.toLowerCase()
     const iconClass = attributes.icon_class || attributes.type
 
-    // Video files
     if (
       extension === "mp4" ||
       extension === "avi" ||
@@ -197,10 +198,8 @@ export function RecordingsTab() {
       extension === "wmv" ||
       iconClass === "video"
     ) {
-      return <FileVideo className="w-6 h-6 text-purple-600" />
+      return <FileVideo className="w-5 h-5 text-purple-600" />
     }
-
-    // Image files
     if (
       extension === "jpg" ||
       extension === "jpeg" ||
@@ -209,41 +208,35 @@ export function RecordingsTab() {
       extension === "bmp" ||
       iconClass === "image"
     ) {
-      return <FileImage className="w-6 h-6 text-pink-600" />
+      return <FileImage className="w-5 h-5 text-pink-600" />
     }
-
-    // Audio files
     if (extension === "mp3" || extension === "wav" || extension === "flac" || extension === "aac") {
-      return <Music className="w-6 h-6 text-green-600" />
+      return <Music className="w-5 h-5 text-green-600" />
     }
 
-    // Document types
     switch (iconClass) {
       case "writer":
-        return <FileText className="w-6 h-6 text-blue-600" />
+        return <FileText className="w-5 h-5 text-blue-600" />
       case "sheet":
-        return <File className="w-6 h-6 text-green-600" />
+        return <File className="w-5 h-5 text-green-600" />
       case "show":
-        return <Play className="w-6 h-6 text-orange-600" />
+        return <FileText className="w-5 h-5 text-orange-600" />
       case "pdf":
-        return <FileText className="w-6 h-6 text-red-600" />
+        return <FileText className="w-5 h-5 text-red-600" />
       default:
-        return <File className="w-6 h-6 text-gray-500" />
+        return <File className="w-5 h-5 text-gray-500" />
     }
   }
 
   const getFileTypeColor = (file: WorkDriveFile) => {
     const { attributes } = file
-
     if (attributes.is_folder) return "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
-
     const extension = attributes.extn?.toLowerCase()
     const iconClass = attributes.icon_class || attributes.type
 
     if (extension === "mp4" || extension === "avi" || extension === "mov" || iconClass === "video") {
       return "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200"
     }
-
     if (
       extension === "jpg" ||
       extension === "jpeg" ||
@@ -270,13 +263,12 @@ export function RecordingsTab() {
 
   const getFileTypeLabel = (file: WorkDriveFile) => {
     const { attributes } = file
-
     if (attributes.is_folder) return "Folder"
-    if (attributes.type === "writer") return "Document"
-    if (attributes.type === "sheet") return "Spreadsheet"
-    if (attributes.type === "show") return "Presentation"
+    if (attributes.type === "writer") return "DOCUMENT"
+    if (attributes.type === "sheet") return "ZSHEET"
+    if (attributes.type === "show") return "SHOW"
     if (attributes.extn) return attributes.extn.toUpperCase()
-    return "File"
+    return "FILE"
   }
 
   const isVideoFile = (file: WorkDriveFile) => {
@@ -307,6 +299,11 @@ export function RecordingsTab() {
     return iconClass === "writer" || iconClass === "sheet" || iconClass === "show" || iconClass === "pdf"
   }
 
+  const isAudioFile = (file: WorkDriveFile) => {
+    const extension = file.attributes.extn?.toLowerCase()
+    return extension === "mp3" || extension === "wav" || extension === "flac" || extension === "aac"
+  }
+
   if (loading) {
     return (
       <div className="p-4 md:p-6">
@@ -324,19 +321,29 @@ export function RecordingsTab() {
     <div className="p-4 md:p-6 space-y-4">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-xl md:text-2xl font-bold">Recordings & Notes</h1>
+          <h1 className="text-xl md:text-2xl font-bold">Files & Recordings</h1>
           <p className="text-sm md:text-base text-muted-foreground">
             Files and folders shared with you from Zoho WorkDrive
           </p>
         </div>
-        <Button
-          onClick={() => fetchSharedFiles(currentFolderId || undefined)}
-          variant="outline"
-          size="sm"
-          className="w-fit"
-        >
-          Refresh
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            onClick={() => setShowDownloadButtons(!showDownloadButtons)}
+            variant="outline"
+            size="sm"
+            className="w-fit"
+          >
+            {showDownloadButtons ? "Hide Downloads" : "Show Downloads"}
+          </Button>
+          <Button
+            onClick={() => fetchSharedFiles(currentFolderId || undefined)}
+            variant="outline"
+            size="sm"
+            className="w-fit"
+          >
+            Refresh
+          </Button>
+        </div>
       </div>
 
       {breadcrumbs.length > 0 && (
@@ -345,13 +352,12 @@ export function RecordingsTab() {
             variant="ghost"
             size="sm"
             onClick={navigateToRoot}
-            className="h-8 px-2 flex-shrink-0 hover:bg-background"
+            className="h-8 px-2 flex-shrink-0 hover:bg-background cursor-pointer"
           >
             <Home className="w-4 h-4" />
           </Button>
           <ChevronRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />
 
-          {/* Mobile: Show only last 2 breadcrumbs */}
           <div className="flex items-center gap-2 overflow-hidden md:hidden">
             {breadcrumbs.length > 2 && (
               <>
@@ -363,7 +369,7 @@ export function RecordingsTab() {
               <div key={crumb.id} className="flex items-center gap-2">
                 <button
                   onClick={() => navigateToBreadcrumb(breadcrumbs.length - arr.length + index)}
-                  className="text-sm font-medium hover:text-blue-600 cursor-pointer truncate max-w-[120px]"
+                  className="text-sm font-medium hover:text-blue-600 cursor-pointer truncate max-w-[120px] transition-colors"
                   title={crumb.name}
                 >
                   {crumb.name}
@@ -373,13 +379,12 @@ export function RecordingsTab() {
             ))}
           </div>
 
-          {/* Desktop: Show all breadcrumbs with truncation */}
           <div className="hidden md:flex items-center gap-2 overflow-hidden flex-1">
             {breadcrumbs.map((crumb, index) => (
               <div key={crumb.id} className="flex items-center gap-2 min-w-0">
                 <button
                   onClick={() => navigateToBreadcrumb(index)}
-                  className="text-sm font-medium hover:text-blue-600 cursor-pointer truncate max-w-[200px]"
+                  className="text-sm font-medium hover:text-blue-600 cursor-pointer truncate max-w-[200px] transition-colors"
                   title={crumb.name}
                 >
                   {crumb.name}
@@ -395,7 +400,7 @@ export function RecordingsTab() {
             variant="ghost"
             size="sm"
             onClick={navigateBack}
-            className="h-8 px-2 ml-auto flex-shrink-0 hover:bg-background"
+            className="h-8 px-2 ml-auto flex-shrink-0 hover:bg-background cursor-pointer"
           >
             <ArrowLeft className="w-4 h-4 mr-1" />
             <span className="hidden sm:inline">Back</span>
@@ -414,171 +419,69 @@ export function RecordingsTab() {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid gap-4">
+        <div className="grid gap-3">
           {files.map((file) => (
-            <Card key={file.id} className="hover:shadow-md transition-all duration-200 hover:border-blue-200">
-              <CardHeader className="pb-3">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex items-start gap-3 md:gap-4 min-w-0 flex-1">
-                    <div className="flex-shrink-0">
-                      {file.attributes.thumbnail_url ? (
-                        <div className="relative">
-                          <img
-                            src={file.attributes.thumbnail_url || "/placeholder.svg"}
-                            alt={file.attributes.name || "File"}
-                            className="w-10 h-10 md:w-12 md:h-12 rounded object-cover"
-                            onError={(e) => {
-                              e.currentTarget.style.display = "none"
-                              e.currentTarget.nextElementSibling?.classList.remove("hidden")
-                            }}
-                          />
-                          <div className="hidden">{getFileIcon(file)}</div>
-                        </div>
-                      ) : (
-                        getFileIcon(file)
+            <Card
+              key={file.id}
+              className="hover:shadow-lg transition-all duration-300 hover:border-blue-200 cursor-pointer group relative p-4"
+              onClick={() => handleFileClick(file)}
+            >
+              {file.attributes.permalink && (
+                <Button
+                  asChild
+                  size="sm"
+                  variant="ghost"
+                  className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10 hover:bg-blue-50 p-1.5"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <a href={file.attributes.permalink} target="_blank" rel="noopener noreferrer">
+                    <ExternalLink className="w-4 h-4" />
+                  </a>
+                </Button>
+              )}
+
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="flex-shrink-0">{getFileIcon(file)}</div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-medium text-base leading-tight hover:text-blue-600 transition-colors mb-1 line-clamp-1">
+                    {file.attributes.display_html_name || file.attributes.name}
+                  </h3>
+                  <div className="flex items-center gap-2 flex-wrap text-sm text-muted-foreground">
+                    <Badge variant="secondary" className={`${getFileTypeColor(file)} text-xs px-2 py-0.5`}>
+                      {getFileTypeLabel(file)}
+                    </Badge>
+                    {!file.attributes.is_folder &&
+                      file.attributes.storage_info?.size &&
+                      file.attributes.storage_info.size !== "0 byte" && (
+                        <span className="text-xs">{file.attributes.storage_info.size}</span>
                       )}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <CardTitle
-                        className={`text-base md:text-lg leading-tight ${
-                          file.attributes.is_folder ? "cursor-pointer hover:text-blue-600 transition-colors" : ""
-                        }`}
-                        title={file.attributes.name}
-                        onClick={() => file.attributes.is_folder && navigateToFolder(file)}
-                      >
-                        <span className="line-clamp-2">
-                          {file.attributes.display_html_name || file.attributes.name}
-                        </span>
-                      </CardTitle>
-                      <div className="flex items-center gap-2 mt-2 flex-wrap">
-                        <Badge variant="secondary" className={`${getFileTypeColor(file)} text-xs`}>
-                          {getFileTypeLabel(file)}
-                        </Badge>
-                        {!file.attributes.is_folder &&
-                          file.attributes.storage_info?.size &&
-                          file.attributes.storage_info.size !== "0 byte" && (
-                            <span className="text-xs md:text-sm text-muted-foreground">
-                              {file.attributes.storage_info.size}
-                            </span>
-                          )}
-                        {file.attributes.lib_info?.name && (
-                          <Badge variant="outline" className="text-xs">
-                            {file.attributes.lib_info.name.replace("_", " ")}
-                          </Badge>
-                        )}
-                      </div>
-                    </div>
+                    {file.attributes.created_time && (
+                      <span className="text-xs">Created {formatDate(file.attributes.created_time)}</span>
+                    )}
+                    {file.attributes.modified_time &&
+                      file.attributes.modified_time !== file.attributes.created_time && (
+                        <span className="text-xs">Modified {formatDate(file.attributes.modified_time)}</span>
+                      )}
                   </div>
                 </div>
-                <CardDescription className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-xs md:text-sm">
-                  {file.attributes.created_by && (
-                    <div className="flex items-center gap-2">
-                      <Avatar className="w-4 h-4 md:w-5 md:h-5">
-                        <AvatarImage src={file.attributes.creator_avatar_url || "/placeholder.svg"} />
-                        <AvatarFallback className="text-xs">
-                          {file.attributes.created_by
-                            .split(" ")
-                            .map((n) => n[0])
-                            .join("")
-                            .slice(0, 2)}
-                        </AvatarFallback>
-                      </Avatar>
-                      <span className="truncate">Created by {file.attributes.created_by}</span>
-                    </div>
-                  )}
-                  <span className="flex items-center gap-1">
-                    <Calendar className="w-3 h-3 md:w-4 md:h-4" />
-                    {formatDate(file.attributes.created_time)}
-                  </span>
-                  {file.attributes.modified_time && file.attributes.modified_time !== file.attributes.created_time && (
-                    <span className="text-muted-foreground hidden sm:inline">
-                      Modified {formatDate(file.attributes.modified_time)}
-                    </span>
-                  )}
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="pt-0">
-                <div className="flex gap-2 flex-wrap">
-                  {file.attributes.is_folder && (
-                    <Button
-                      size="sm"
-                      variant="default"
-                      onClick={() => navigateToFolder(file)}
-                      className="hover:bg-blue-600 transition-colors"
-                    >
-                      <Folder className="w-4 h-4 mr-1" />
-                      <span className="hidden sm:inline">Open Folder</span>
-                      <span className="sm:hidden">Open</span>
-                    </Button>
-                  )}
-                  {file.attributes.permalink && (
-                    <Button asChild size="sm" variant="default" className="hover:bg-blue-600 transition-colors">
-                      <a href={file.attributes.permalink} target="_blank" rel="noopener noreferrer">
-                        <ExternalLink className="w-4 h-4 mr-1" />
-                        <span className="hidden sm:inline">Open in WorkDrive</span>
-                        <span className="sm:hidden">WorkDrive</span>
-                      </a>
-                    </Button>
-                  )}
-                  {file.attributes.download_url && !file.attributes.is_folder && (
-                    <Button
-                      asChild
-                      size="sm"
-                      variant="outline"
-                      className="hover:bg-gray-50 transition-colors bg-transparent"
-                    >
-                      <a href={file.attributes.download_url} target="_blank" rel="noopener noreferrer">
-                        <Download className="w-4 h-4 mr-1" />
-                        Download
-                      </a>
-                    </Button>
-                  )}
-                  {/* File-type-specific preview/play buttons */}
-                  {!file.attributes.is_folder && (
-                    <>
-                      {isVideoFile(file) && file.attributes.thumbnail_url && (
-                        <Button
-                          asChild
-                          size="sm"
-                          variant="outline"
-                          className="hover:bg-purple-50 transition-colors bg-transparent"
-                        >
-                          <a href={file.attributes.thumbnail_url} target="_blank" rel="noopener noreferrer">
-                            <Play className="w-4 h-4 mr-1" />
-                            Play
-                          </a>
-                        </Button>
-                      )}
-                      {isImageFile(file) && file.attributes.thumbnail_url && (
-                        <Button
-                          asChild
-                          size="sm"
-                          variant="outline"
-                          className="hover:bg-pink-50 transition-colors bg-transparent"
-                        >
-                          <a href={file.attributes.thumbnail_url} target="_blank" rel="noopener noreferrer">
-                            <Eye className="w-4 h-4 mr-1" />
-                            Preview
-                          </a>
-                        </Button>
-                      )}
-                      {isDocumentFile(file) && file.attributes.thumbnail_url && (
-                        <Button
-                          asChild
-                          size="sm"
-                          variant="outline"
-                          className="hover:bg-blue-50 transition-colors bg-transparent"
-                        >
-                          <a href={file.attributes.thumbnail_url} target="_blank" rel="noopener noreferrer">
-                            <Eye className="w-4 h-4 mr-1" />
-                            Preview
-                          </a>
-                        </Button>
-                      )}
-                    </>
-                  )}
+              </div>
+
+              {showDownloadButtons && file.attributes.download_url && !file.attributes.is_folder && (
+                <div className="mt-3 pt-3 border-t">
+                  <Button
+                    asChild
+                    size="sm"
+                    variant="outline"
+                    className="hover:bg-gray-50 transition-colors bg-transparent"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <a href={file.attributes.download_url} target="_blank" rel="noopener noreferrer">
+                      <Download className="w-4 h-4 mr-1" />
+                      Download
+                    </a>
+                  </Button>
                 </div>
-              </CardContent>
+              )}
             </Card>
           ))}
         </div>
