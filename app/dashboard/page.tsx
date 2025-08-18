@@ -43,20 +43,20 @@ export default function DashboardPage() {
 
   const renderTabContent = () => {
     switch (activeTab) {
-      case "meetings":
-        return <MeetingsTab />
+      // case "meetings":
+      //   return <MeetingsTab />
       case "recordings":
         return <RecordingsTab />
       case "courses":
         return <CoursesTab />
-      case "mail":
-        return <MailTab />
-      case "references":
-        return <ReferencesTab />
+      // case "mail":
+      //   return <MailTab />
+      // case "references":
+      //   return <ReferencesTab />
       case "profile": // Added profile tab case
         return <UserProfile />
       default:
-        return <MeetingsTab />
+        return <RecordingsTab />
     }
   }
 

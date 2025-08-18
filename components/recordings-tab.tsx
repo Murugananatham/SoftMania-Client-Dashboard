@@ -172,7 +172,7 @@ export function RecordingsTab() {
     if (!dateString) return "Unknown"
     try {
       return new Date(dateString).toLocaleDateString("en-US", {
-        year: "numeric",
+        // year: "numeric",
         month: "short",
         day: "numeric",
         hour: "2-digit",
@@ -327,14 +327,14 @@ export function RecordingsTab() {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button
+          {/* <Button
             onClick={() => setShowDownloadButtons(!showDownloadButtons)}
             variant="outline"
             size="sm"
             className="w-fit"
           >
             {showDownloadButtons ? "Hide Downloads" : "Show Downloads"}
-          </Button>
+          </Button> */}
           <Button
             onClick={() => fetchSharedFiles(currentFolderId || undefined)}
             variant="outline"

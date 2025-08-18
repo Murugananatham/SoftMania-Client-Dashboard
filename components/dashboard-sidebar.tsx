@@ -28,11 +28,11 @@ import {
 } from "@/components/ui/alert-dialog"
 
 const menuItems = [
-  {
-    title: "Meetings",
-    icon: Calendar,
-    id: "meetings",
-  },
+  // {
+  //   title: "Meetings",
+  //   icon: Calendar,
+  //   id: "meetings",
+  // },
   {
     title: "Files & Recordings",
     icon: FileText,
@@ -43,16 +43,16 @@ const menuItems = [
     icon: GraduationCap,
     id: "courses",
   },
-  {
-    title: "Mails",
-    icon: Mail,
-    id: "mail",
-  },
-  {
-    title: "Reference Links",
-    icon: ExternalLink,
-    id: "references",
-  },
+  // {
+  //   title: "Mails",
+  //   icon: Mail,
+  //   id: "mail",
+  // },
+  // {
+  //   title: "Reference Links",
+  //   icon: ExternalLink,
+  //   id: "references",
+  // },
 ]
 
 interface DashboardSidebarProps {
