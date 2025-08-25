@@ -1,4 +1,4 @@
-import { ZOHO_CONFIG, type ZohoTokens, type ZohoUser } from "./zoho-config"
+import { ZOHO_CONFIG, ZOHO_DATA_CENTERS, type ZohoTokens, type ZohoUser, type DataCenter, type DataCenterCode, getDataCenterByCode } from "./zoho-config"
 
 export interface ZohoMeetingUser {
   zsoid: number
@@ -29,12 +29,26 @@ export interface ZohoMeeting {
 export class ZohoClient {
   private accessToken: string
   private meetingUserInfo: ZohoMeetingUser | null = null
+  private dataCenter: DataCenter // Added data center property
+  private apiDomain?: string // Added API domain from token response
 
-  constructor(accessToken: string) {
+  constructor(accessToken: string, dataCenter: DataCenter, apiDomain?: string) {
     this.accessToken = accessToken
+    this.dataCenter = dataCenter
+    this.apiDomain = apiDomain
   }
 
-  private async makeRequest(fullUrl: string, options: RequestInit = {}) {
+  private async makeRequest(endpoint: string, service: 'api' | 'meeting' | 'learn' | 'mail' | 'workdrive' = 'api', options: RequestInit = {}) {
+    // Use apiDomain from token response if available, otherwise use data center URL
+    let baseUrl: string
+    if (this.apiDomain && service === 'api') {
+      baseUrl = this.apiDomain
+    } else {
+      baseUrl = this.dataCenter[service]
+    }
+    
+    const fullUrl = `${baseUrl}${endpoint}`
+    
     const response = await fetch(fullUrl, {
       ...options,
       headers: {
@@ -51,6 +65,7 @@ export class ZohoClient {
         statusText: response.statusText,
         error: errorText,
         url: fullUrl,
+        dataCenter: this.dataCenter.code
       })
       throw new Error(`Zoho API error: ${response.status} ${response.statusText} - ${errorText}`)
     }
@@ -64,9 +79,7 @@ export class ZohoClient {
     }
 
     try {
-      // Try Indian region first
-      let baseUrl = "https://meeting.zoho.in"
-      let response = await fetch(`${baseUrl}/api/v2/user.json`, {
+      const response = await fetch(`${this.dataCenter.meeting}/api/v2/user.json`, {
         method: "GET",
         headers: {
           Authorization: `Zoho-oauthtoken ${this.accessToken}`,
@@ -74,47 +87,13 @@ export class ZohoClient {
         },
       })
 
-      // If Indian region fails, try global region
-      if (!response.ok && (response.status === 404 || response.status === 405)) {
-        console.log("Indian region failed, trying global region...")
-        baseUrl = "https://meeting.zoho.com"
-        response = await fetch(`${baseUrl}/api/v2/user.json`, {
-          method: "GET",
-          headers: {
-            Authorization: `Zoho-oauthtoken ${this.accessToken}`,
-            "Content-Type": "application/json",
-          },
-        })
-      }
-
-      if (!response.ok && response.status === 405) {
-        console.log("Trying without .json extension...")
-        response = await fetch(`${baseUrl}/api/v2/user`, {
-          method: "GET",
-          headers: {
-            Authorization: `Zoho-oauthtoken ${this.accessToken}`,
-            "Content-Type": "application/json",
-          },
-        })
-      }
-
-      if (!response.ok && response.status === 405) {
-        console.log("Trying POST method without .json...")
-        response = await fetch(`${baseUrl}/api/v2/user`, {
-          method: "POST",
-          headers: {
-            Authorization: `Zoho-oauthtoken ${this.accessToken}`,
-            "Content-Type": "application/json",
-          },
-        })
-      }
-
       if (!response.ok) {
         const errorText = await response.text()
         console.error("Meeting user info request failed:", {
           status: response.status,
           statusText: response.statusText,
           error: errorText,
+          dataCenter: this.dataCenter.code
         })
         throw new Error(`Failed to get meeting user info: ${response.status} ${response.statusText}`)
       }
@@ -124,8 +103,9 @@ export class ZohoClient {
       console.log("Meeting user info received:", {
         zsoid: this.meetingUserInfo?.zsoid,
         server: this.meetingUserInfo?.meetingRedirectionServer,
+        dataCenter: this.dataCenter.code
       })
-
+      this.meetingUserInfo = (data.userDetails || data) as ZohoMeetingUser
       return this.meetingUserInfo
     } catch (error) {
       console.error("Error in getMeetingUserInfo:", error)
@@ -133,10 +113,9 @@ export class ZohoClient {
     }
   }
 
-  // User Details
   async getUserDetails(): Promise<ZohoUser> {
     try {
-      const response = await fetch("https://accounts.zoho.in/oauth/v2/userinfo", {
+      const response = await fetch(`${this.dataCenter.accounts}/oauth/v2/userinfo`, {
         headers: {
           Authorization: `Bearer ${this.accessToken}`,
           "Content-Type": "application/json",
@@ -150,6 +129,7 @@ export class ZohoClient {
           statusText: response.statusText,
           error: errorText,
           url: response.url,
+          dataCenter: this.dataCenter.code
         })
         throw new Error(`Failed to get user details: ${response.status} ${response.statusText} - ${errorText}`)
       }
@@ -171,17 +151,14 @@ export class ZohoClient {
   async getMeetings() {
     try {
       const userInfo = await this.getMeetingUserInfo()
-      const baseUrl = userInfo.meetingRedirectionServer.includes("zoho.in")
-        ? "https://meeting.zoho.in"
-        : "https://meeting.zoho.com"
-
+      
       const params = new URLSearchParams({
         listtype: "all",
         index: "1",
         count: "100",
       })
 
-      const response = await fetch(`${baseUrl}/api/v2/${userInfo.zsoid}/sessions.json?${params}`, {
+      const response = await fetch(`${this.dataCenter.meeting}/api/v2/${userInfo.zsoid}/sessions.json?${params}`, {
         headers: {
           Authorization: `Zoho-oauthtoken ${this.accessToken}`,
           "Content-Type": "application/json;charset=UTF-8",
@@ -231,11 +208,8 @@ export class ZohoClient {
   async getMeetingDetails(sessionKey: string) {
     try {
       const userInfo = await this.getMeetingUserInfo()
-      const baseUrl = userInfo.meetingRedirectionServer.includes("zoho.in")
-        ? "https://meeting.zoho.in"
-        : "https://meeting.zoho.com"
-
-      const response = await fetch(`${baseUrl}/api/v2/${userInfo.zsoid}/sessions/${sessionKey}.json`, {
+      
+      const response = await fetch(`${this.dataCenter.meeting}/api/v2/${userInfo.zsoid}/sessions/${sessionKey}.json`, {
         headers: {
           Authorization: `Zoho-oauthtoken ${this.accessToken}`,
           "Content-Type": "application/json;charset=UTF-8",
@@ -257,11 +231,8 @@ export class ZohoClient {
   async getMeetingParticipants(sessionKey: string) {
     try {
       const userInfo = await this.getMeetingUserInfo()
-      const baseUrl = userInfo.meetingRedirectionServer.includes("zoho.in")
-        ? "https://meeting.zoho.in"
-        : "https://meeting.zoho.com"
-
-      const response = await fetch(`${baseUrl}/api/v2/${userInfo.zsoid}/sessions/${sessionKey}/participants.json`, {
+      
+      const response = await fetch(`${this.dataCenter.meeting}/api/v2/${userInfo.zsoid}/sessions/${sessionKey}/participants.json`, {
         headers: {
           Authorization: `Zoho-oauthtoken ${this.accessToken}`,
           "Content-Type": "application/json;charset=UTF-8",
@@ -284,11 +255,8 @@ export class ZohoClient {
   async getMeetingRecordings() {
     try {
       const userInfo = await this.getMeetingUserInfo()
-      const baseUrl = userInfo.meetingRedirectionServer.includes("zoho.in")
-        ? "https://meeting.zoho.in"
-        : "https://meeting.zoho.com"
-
-      const response = await fetch(`${baseUrl}/meeting/api/v2/${userInfo.zsoid}/recordings.json`, {
+      
+      const response = await fetch(`${this.dataCenter.meeting}/meeting/api/v2/${userInfo.zsoid}/recordings.json`, {
         headers: {
           Authorization: `Zoho-oauthtoken ${this.accessToken}`,
           "Content-Type": "application/json;charset=UTF-8",
@@ -312,11 +280,8 @@ export class ZohoClient {
   async getSharedRecordings() {
     try {
       const userInfo = await this.getMeetingUserInfo()
-      const baseUrl = userInfo.meetingRedirectionServer.includes("zoho.in")
-        ? "https://meeting.zoho.in"
-        : "https://meeting.zoho.com"
-
-      let response = await fetch(`${baseUrl}/meeting/api/v2/${userInfo.zsoid}/sharedrecordings.json`, {
+      
+      let response = await fetch(`${this.dataCenter.meeting}/meeting/api/v2/${userInfo.zsoid}/sharedrecordings.json`, {
         headers: {
           Authorization: `Zoho-oauthtoken ${this.accessToken}`,
           "Content-Type": "application/json;charset=UTF-8",
@@ -325,7 +290,7 @@ export class ZohoClient {
 
       // If that fails, try without the /meeting/ prefix
       if (!response.ok && response.status === 404) {
-        response = await fetch(`${baseUrl}/api/v2/${userInfo.zsoid}/sharedrecordings.json`, {
+        response = await fetch(`${this.dataCenter.meeting}/api/v2/${userInfo.zsoid}/sharedrecordings.json`, {
           headers: {
             Authorization: `Zoho-oauthtoken ${this.accessToken}`,
             "Content-Type": "application/json;charset=UTF-8",
@@ -347,31 +312,20 @@ export class ZohoClient {
     }
   }
 
-  getRecordingDownloadUrl(erecordingId: string, region = "in"): string {
-    const baseUrl = region === "in" ? "https://download-accl.zoho.com" : "https://download-accl.zoho.com"
-    return `${baseUrl}/webdownload?event-id=${erecordingId}&x-service=meetinglab&x-cli-msg=`
+  getRecordingDownloadUrl(erecordingId: string): string {
+    // Use data center specific download URL
+    const downloadDomain = this.dataCenter.code === 'in' ? 'download-accl.zoho.com' : 'download-accl.zoho.com'
+    return `https://${downloadDomain}/webdownload?event-id=${erecordingId}&x-service=meetinglab&x-cli-msg=`
   }
 
   async getWorkDriveUserInfo() {
     try {
-      // Try Indian region first
-      let response = await fetch("https://www.zohoapis.in/workdrive/api/v1/users/me", {
+      const response = await fetch(`${this.dataCenter.workdrive}/workdrive/api/v1/users/me`, {
         headers: {
           Authorization: `Bearer ${this.accessToken}`,
           "Content-Type": "application/json",
         },
       })
-
-      // If Indian region fails, try global region
-      if (!response.ok && response.status === 404) {
-        console.log("Indian region failed for WorkDrive, trying global region...")
-        response = await fetch("https://www.zohoapis.com/workdrive/api/v1/users/me", {
-          headers: {
-            Authorization: `Bearer ${this.accessToken}`,
-            "Content-Type": "application/json",
-          },
-        })
-      }
 
       if (!response.ok) {
         const errorText = await response.text()
@@ -379,6 +333,7 @@ export class ZohoClient {
           status: response.status,
           statusText: response.statusText,
           error: errorText,
+          dataCenter: this.dataCenter.code
         })
         throw new Error(`Failed to get WorkDrive user info: ${response.status} ${response.statusText}`)
       }
@@ -394,24 +349,12 @@ export class ZohoClient {
 
   async getWorkDrivePrivateSpace(userId: string) {
     try {
-      // Try Indian region first
-      let response = await fetch(`https://www.zohoapis.in/workdrive/api/v1/users/${userId}/privatespace`, {
+      const response = await fetch(`${this.dataCenter.workdrive}/workdrive/api/v1/users/${userId}/privatespace`, {
         headers: {
           Authorization: `Bearer ${this.accessToken}`,
           "Content-Type": "application/json",
         },
       })
-
-      // If Indian region fails, try global region
-      if (!response.ok && response.status === 404) {
-        console.log("Indian region failed for WorkDrive privatespace, trying global region...")
-        response = await fetch(`https://www.zohoapis.com/workdrive/api/v1/users/${userId}/privatespace`, {
-          headers: {
-            Authorization: `Bearer ${this.accessToken}`,
-            "Content-Type": "application/json",
-          },
-        })
-      }
 
       if (!response.ok) {
         const errorText = await response.text()
@@ -419,6 +362,7 @@ export class ZohoClient {
           status: response.status,
           statusText: response.statusText,
           error: errorText,
+          dataCenter: this.dataCenter.code
         })
         throw new Error(`Failed to get WorkDrive privatespace: ${response.status} ${response.statusText}`)
       }
@@ -437,29 +381,14 @@ export class ZohoClient {
       const sharedFiles: any[] = []
       const sharedFolders: any[] = []
 
-      // Try Indian region first
-      let baseUrl = "https://www.zohoapis.in"
-
       // Get shared files (incomingfiles)
       try {
-        let response = await fetch(`${baseUrl}/workdrive/api/v1/privatespace/${privatespaceId}/incomingfiles`, {
+        const response = await fetch(`${this.dataCenter.workdrive}/workdrive/api/v1/privatespace/${privatespaceId}/incomingfiles`, {
           headers: {
             Authorization: `Bearer ${this.accessToken}`,
             "Content-Type": "application/json",
           },
         })
-
-        // If Indian region fails, try global region
-        if (!response.ok && response.status === 404) {
-          console.log("Indian region failed for shared files, trying global region...")
-          baseUrl = "https://www.zohoapis.com"
-          response = await fetch(`${baseUrl}/workdrive/api/v1/privatespace/${privatespaceId}/incomingfiles`, {
-            headers: {
-              Authorization: `Bearer ${this.accessToken}`,
-              "Content-Type": "application/json",
-            },
-          })
-        }
 
         if (response.ok) {
           const filesData = await response.json()
@@ -471,7 +400,7 @@ export class ZohoClient {
 
       // Get shared folders (incomingfolders)
       try {
-        const response = await fetch(`${baseUrl}/workdrive/api/v1/privatespace/${privatespaceId}/incomingfolders`, {
+        const response = await fetch(`${this.dataCenter.workdrive}/workdrive/api/v1/privatespace/${privatespaceId}/incomingfolders`, {
           headers: {
             Authorization: `Bearer ${this.accessToken}`,
             "Content-Type": "application/json",
@@ -498,27 +427,12 @@ export class ZohoClient {
 
   async getFolderContents(folderId: string) {
     try {
-      // Try Indian region first
-      let baseUrl = "https://www.zohoapis.in"
-
-      let response = await fetch(`${baseUrl}/workdrive/api/v1/files/${folderId}/files`, {
+      const response = await fetch(`${this.dataCenter.workdrive}/workdrive/api/v1/files/${folderId}/files`, {
         headers: {
           Authorization: `Bearer ${this.accessToken}`,
           "Content-Type": "application/json",
         },
       })
-
-      // If Indian region fails, try global region
-      if (!response.ok && response.status === 404) {
-        console.log("Indian region failed for folder contents, trying global region...")
-        baseUrl = "https://www.zohoapis.com"
-        response = await fetch(`${baseUrl}/workdrive/api/v1/files/${folderId}/files`, {
-          headers: {
-            Authorization: `Bearer ${this.accessToken}`,
-            "Content-Type": "application/json",
-          },
-        })
-      }
 
       if (!response.ok) {
         const errorText = await response.text()
@@ -527,6 +441,7 @@ export class ZohoClient {
           statusText: response.statusText,
           error: errorText,
           folderId,
+          dataCenter: this.dataCenter.code
         })
         throw new Error(`Failed to get folder contents: ${response.status} ${response.statusText}`)
       }
@@ -542,7 +457,7 @@ export class ZohoClient {
 
   async getWorkDriveFiles() {
     try {
-      const data = await this.makeRequest("https://www.zohoapis.in/workdrive/api/v1/files")
+      const data = await this.makeRequest("/workdrive/api/v1/files", 'workdrive')
       return data.data || []
     } catch (error) {
       console.error("Error fetching WorkDrive files:", error)
@@ -552,7 +467,7 @@ export class ZohoClient {
 
   async getLearnCourses() {
     try {
-      const data = await this.makeRequest("https://learn.zoho.in/api/v1/courses")
+      const data = await this.makeRequest("/api/v1/courses", 'learn')
       return data.courses || []
     } catch (error) {
       console.error("Error fetching Learn courses:", error)
@@ -563,7 +478,7 @@ export class ZohoClient {
   async getMailMessages() {
     try {
       // First get account information
-      const accountsResponse = await fetch("https://mail.zoho.in/api/accounts", {
+      const accountsResponse = await fetch(`${this.dataCenter.mail}/api/accounts`, {
         headers: {
           Authorization: `Bearer ${this.accessToken}`,
           "Content-Type": "application/json",
@@ -585,7 +500,7 @@ export class ZohoClient {
 
       // Use the first account to fetch messages
       const accountId = accounts[0].accountId
-      const data = await this.makeRequest(`https://mail.zoho.in/api/accounts/${accountId}/messages/view`)
+      const data = await this.makeRequest(`/api/accounts/${accountId}/messages/view`, 'mail')
       return data.data || []
     } catch (error) {
       console.error("Error fetching mail messages:", error)
@@ -594,8 +509,20 @@ export class ZohoClient {
   }
 }
 
-export async function exchangeCodeForTokens(code: string): Promise<ZohoTokens> {
-  const response = await fetch(ZOHO_CONFIG.tokenUrl, {
+export async function exchangeCodeForTokens(code: string, location?: string): Promise<{ tokens: ZohoTokens, dataCenter: DataCenter, apiDomain?: string }> {
+  // Determine which data center to use for token exchange
+  let tokenUrl = ZOHO_CONFIG.tokenUrl
+  let dataCenter: DataCenter = ZOHO_DATA_CENTERS.US // ✅ fallback US
+  
+  if (location) {
+    const dc = getDataCenterByCode(location)
+    if (dc) {
+      tokenUrl = `${dc.accounts}/oauth/v2/token`
+      dataCenter = dc
+    }
+  }
+
+  const response = await fetch(tokenUrl, {
     method: "POST",
     headers: {
       "Content-Type": "application/x-www-form-urlencoded",
@@ -615,6 +542,7 @@ export async function exchangeCodeForTokens(code: string): Promise<ZohoTokens> {
       status: response.status,
       statusText: response.statusText,
       error: errorText,
+      dataCenter: dataCenter.code
     })
     throw new Error(`Failed to exchange code for tokens: ${response.status} ${response.statusText} - ${errorText}`)
   }
@@ -623,6 +551,13 @@ export async function exchangeCodeForTokens(code: string): Promise<ZohoTokens> {
   console.log("Token exchange successful:", {
     hasAccessToken: !!tokens.access_token,
     tokenType: tokens.token_type,
+    dataCenter: dataCenter.code,
+    apiDomain: tokens.api_domain
   })
-  return tokens
+  
+  return { 
+    tokens, 
+    dataCenter,
+    apiDomain: tokens.api_domain 
+  }
 }

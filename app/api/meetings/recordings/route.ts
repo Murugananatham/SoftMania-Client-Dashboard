@@ -10,7 +10,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 })
     }
 
-    const client = new ZohoClient(session.tokens.access_token)
+    const client = new ZohoClient(session.tokens.access_token, session.dataCenter, session.apiDomain)
     const recordings = await client.getMeetingRecordings()
 
     return NextResponse.json({ recordings })

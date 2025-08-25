@@ -13,10 +13,18 @@ import {
   FileVideo,
   FileImage,
   Music,
+  ChevronDown,
 } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu"
 
 interface WorkDriveFile {
   id: string
@@ -51,6 +59,10 @@ interface BreadcrumbItem {
   name: string
 }
 
+interface FolderContents {
+  [folderId: string]: WorkDriveFile[]
+}
+
 export function RecordingsTab() {
   const [files, setFiles] = useState<WorkDriveFile[]>([])
   const [loading, setLoading] = useState(true)
@@ -58,6 +70,8 @@ export function RecordingsTab() {
   const [breadcrumbs, setBreadcrumbs] = useState<BreadcrumbItem[]>([])
   const [previewFile, setPreviewFile] = useState<WorkDriveFile | null>(null)
   const [showDownloadButtons, setShowDownloadButtons] = useState(false)
+  const [folderContentsCache, setFolderContentsCache] = useState<FolderContents>({})
+  const [loadingFolders, setLoadingFolders] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     fetchSharedFiles()
@@ -96,7 +110,37 @@ export function RecordingsTab() {
     })
   }
 
-  // ... existing navigation functions ...
+  const fetchFolderContentsForDropdown = async (folderId: string) => {
+    if (folderContentsCache[folderId] || loadingFolders.has(folderId)) {
+      return folderContentsCache[folderId] || []
+    }
+
+    setLoadingFolders((prev) => new Set(prev).add(folderId))
+
+    try {
+      const response = await fetch(`/api/workdrive/folder-contents?folderId=${folderId}`)
+      const data = await response.json()
+
+      if (!data.error && data.files) {
+        const uniqueFiles = removeDuplicates(data.files)
+        setFolderContentsCache((prev) => ({
+          ...prev,
+          [folderId]: uniqueFiles,
+        }))
+        return uniqueFiles
+      }
+    } catch (error) {
+      console.error("Error fetching folder contents for dropdown:", error)
+    } finally {
+      setLoadingFolders((prev) => {
+        const newSet = new Set(prev)
+        newSet.delete(folderId)
+        return newSet
+      })
+    }
+
+    return []
+  }
 
   const navigateToFolder = async (folder: WorkDriveFile) => {
     if (!folder.attributes.is_folder) return
@@ -166,6 +210,79 @@ export function RecordingsTab() {
         window.open(file.attributes.permalink, "_blank", "noopener,noreferrer")
       }
     }
+  }
+
+  const BreadcrumbDropdown = ({ crumb, index }: { crumb: BreadcrumbItem; index: number }) => {
+    const [dropdownContents, setDropdownContents] = useState<WorkDriveFile[]>([])
+    const [isOpen, setIsOpen] = useState(false)
+
+    const handleOpenChange = async (open: boolean) => {
+      setIsOpen(open)
+      if (open && dropdownContents.length === 0) {
+        const contents = await fetchFolderContentsForDropdown(crumb.id)
+        setDropdownContents(contents)
+      }
+    }
+
+    const handleItemClick = (file: WorkDriveFile) => {
+      setIsOpen(false)
+      handleFileClick(file)
+    }
+
+    return (
+      <DropdownMenu open={isOpen} onOpenChange={handleOpenChange}>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => navigateToBreadcrumb(index)}
+            className="text-sm font-medium hover:text-blue-600 cursor-pointer truncate max-w-[200px] transition-colors"
+            title={crumb.name}
+          >
+            {crumb.name}
+          </button>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="sm" className="h-6 w-6 p-0 hover:bg-blue-50 transition-colors">
+              <ChevronDown className="w-3 h-3" />
+            </Button>
+          </DropdownMenuTrigger>
+        </div>
+        <DropdownMenuContent align="start" className="w-64 max-h-80 overflow-y-auto">
+          {loadingFolders.has(crumb.id) ? (
+            <div className="p-2 text-center text-sm text-muted-foreground">Loading...</div>
+          ) : dropdownContents.length === 0 ? (
+            <div className="p-2 text-center text-sm text-muted-foreground">No items found</div>
+          ) : (
+            <>
+              {dropdownContents
+                .filter((file) => file.attributes.is_folder)
+                .map((folder) => (
+                  <DropdownMenuItem
+                    key={folder.id}
+                    onClick={() => handleItemClick(folder)}
+                    className="flex items-center gap-2 cursor-pointer"
+                  >
+                    <Folder className="w-4 h-4 text-blue-500" />
+                    <span className="truncate">{folder.attributes.name}</span>
+                  </DropdownMenuItem>
+                ))}
+              {dropdownContents.filter((file) => file.attributes.is_folder).length > 0 &&
+                dropdownContents.filter((file) => !file.attributes.is_folder).length > 0 && <DropdownMenuSeparator />}
+              {dropdownContents
+                .filter((file) => !file.attributes.is_folder)
+                .map((file) => (
+                  <DropdownMenuItem
+                    key={file.id}
+                    onClick={() => handleItemClick(file)}
+                    className="flex items-center gap-2 cursor-pointer"
+                  >
+                    {getFileIcon(file)}
+                    <span className="truncate">{file.attributes.name}</span>
+                  </DropdownMenuItem>
+                ))}
+            </>
+          )}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    )
   }
 
   const formatDate = (dateString?: string) => {
@@ -327,14 +444,6 @@ export function RecordingsTab() {
           </p>
         </div>
         <div className="flex gap-2">
-          {/* <Button
-            onClick={() => setShowDownloadButtons(!showDownloadButtons)}
-            variant="outline"
-            size="sm"
-            className="w-fit"
-          >
-            {showDownloadButtons ? "Hide Downloads" : "Show Downloads"}
-          </Button> */}
           <Button
             onClick={() => fetchSharedFiles(currentFolderId || undefined)}
             variant="outline"
@@ -367,13 +476,7 @@ export function RecordingsTab() {
             )}
             {breadcrumbs.slice(-2).map((crumb, index, arr) => (
               <div key={crumb.id} className="flex items-center gap-2">
-                <button
-                  onClick={() => navigateToBreadcrumb(breadcrumbs.length - arr.length + index)}
-                  className="text-sm font-medium hover:text-blue-600 cursor-pointer truncate max-w-[120px] transition-colors"
-                  title={crumb.name}
-                >
-                  {crumb.name}
-                </button>
+                <BreadcrumbDropdown crumb={crumb} index={breadcrumbs.length - arr.length + index} />
                 {index < arr.length - 1 && <ChevronRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />}
               </div>
             ))}
@@ -382,13 +485,7 @@ export function RecordingsTab() {
           <div className="hidden md:flex items-center gap-2 overflow-hidden flex-1">
             {breadcrumbs.map((crumb, index) => (
               <div key={crumb.id} className="flex items-center gap-2 min-w-0">
-                <button
-                  onClick={() => navigateToBreadcrumb(index)}
-                  className="text-sm font-medium hover:text-blue-600 cursor-pointer truncate max-w-[200px] transition-colors"
-                  title={crumb.name}
-                >
-                  {crumb.name}
-                </button>
+                <BreadcrumbDropdown crumb={crumb} index={index} />
                 {index < breadcrumbs.length - 1 && (
                   <ChevronRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />
                 )}

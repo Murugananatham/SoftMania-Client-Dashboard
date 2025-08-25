@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Folder ID is required" }, { status: 400 })
     }
 
-    const zohoClient = new ZohoClient(session.tokens.access_token)
+    const zohoClient = new ZohoClient(session.tokens.access_token, session.dataCenter, session.apiDomain)
 
     // Get folder contents
     const files = await zohoClient.getFolderContents(folderId)

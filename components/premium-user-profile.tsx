@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { User, Mail, LogOut, ChevronDown } from "lucide-react"
+import { User, Mail, LogOut, ChevronDown, Globe } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -30,6 +30,10 @@ interface UserData {
   avatar_url?: string
   zid: string
   edition?: string
+  region?: {
+    code: string
+    name: string
+  }
 }
 
 export function PremiumUserProfile() {
@@ -44,16 +48,23 @@ export function PremiumUserProfile() {
 
   const fetchUserData = async () => {
     try {
-      const response = await fetch("/api/workdrive/user-info")
-      if (response.ok) {
-        const data = await response.json()
-        if (data.data && data.data.attributes) {
+      const [workdriveResponse, userResponse] = await Promise.all([
+        fetch("/api/workdrive/user-info"),
+        fetch("/api/user"),
+      ])
+
+      if (workdriveResponse.ok && userResponse.ok) {
+        const workdriveData = await workdriveResponse.json()
+        const userData = await userResponse.json()
+
+        if (workdriveData.data && workdriveData.data.attributes) {
           setUser({
-            display_name: data.data.attributes.display_name,
-            email_id: data.data.attributes.email_id,
-            avatar_url: data.data.attributes.avatar_url,
-            zid: data.data.attributes.zid,
-            edition: data.data.attributes.edition,
+            display_name: workdriveData.data.attributes.display_name,
+            email_id: workdriveData.data.attributes.email_id,
+            avatar_url: workdriveData.data.attributes.avatar_url,
+            zid: workdriveData.data.attributes.zid,
+            edition: workdriveData.data.attributes.edition,
+            region: userData.dataCenter,
           })
         }
       }
@@ -111,7 +122,6 @@ export function PremiumUserProfile() {
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-64 p-0">
-          
           <div className="p-2">
             <DropdownMenuLabel className="px-2 py-1 text-xs font-medium text-gray-500 dark:text-gray-400">
               Account Details
@@ -132,6 +142,18 @@ export function PremiumUserProfile() {
                 <p className="text-xs text-gray-500 truncate">{user.email_id}</p>
               </div>
             </DropdownMenuItem>
+
+            {user?.region && (
+              <DropdownMenuItem className="flex items-center gap-3 px-3 py-2 cursor-pointer">
+                <Globe className="w-4 h-4 text-gray-500" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium">Region</p>
+                  <p className="text-xs text-gray-500 truncate">
+                    {user.region.name} ({user.region.code.toUpperCase()})
+                  </p>
+                </div>
+              </DropdownMenuItem>
+            )}
 
             <DropdownMenuSeparator className="my-2" />
 
