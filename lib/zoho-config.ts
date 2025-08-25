@@ -92,7 +92,7 @@ export const ZOHO_CONFIG = {
   authUrl: "https://accounts.zoho.com/oauth/v2/auth",
   tokenUrl: "https://accounts.zoho.com/oauth/v2/token",
   scope:
-    "WorkDrive.files.ALL,ZohoSearch.securesearch.READ,WorkDrive.team.READ,profile,ZohoMeeting.meeting.READ,ZohoMeeting.manageOrg.READ,ZohoMeeting.meetinguds.READ,ZohoFiles.files.READ,ZohoMeeting.recording.READ,WorkDrive.teamfolders.READ,ZohoMail.messages.READ",
+    "WorkDrive.files.ALL,WorkDrive.team.READ,profile,WorkDrive.teamfolders.READ",
   apiBaseUrl: "https://www.zohoapis.com", // Default to global, will be updated per user
 }
 
